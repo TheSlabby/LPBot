@@ -1,8 +1,8 @@
 #include "LPBot.h"
 
-LPBot::LPBot(const char* token)
+LPBot::LPBot(const char* token, const char* dir)
     : bot(token, dpp::i_default_intents | dpp::i_message_content),
-    matchDB("/home/walker/LPBot/database.sqlite")
+    matchDB(std::filesystem::path(dir) / "database.sqlite")
 {
     // events
     bot.on_message_create([this](const dpp::message_create_t& event){
@@ -15,16 +15,19 @@ LPBot::LPBot(const char* token)
         this->onLog(event);
     });
 
-    // grab puuid
-    auto puuid = riotAPI.getPUUID("TheSlab", "333");
-    if (puuid) {
-        std::cout << " got puuid: " << *puuid << std::endl;
-        // get ranked info
-        riotAPI.getPlayerData(*puuid);
-    }
+    // load players to track
+    loadPlayersToTrack(std::filesystem::path(dir) / "players.txt");
 
-    bool inserted = matchDB.saveMatch("test", "testData");
-    std::cout << "insreted match: " << inserted << std::endl;
+    // start update thread
+    update_thread = std::thread(&LPBot::update, this);
+}
+
+LPBot::~LPBot()
+{
+    stopUpdates = true; 
+
+    if (update_thread.joinable())
+        update_thread.join();
 }
 
 void LPBot::start()
@@ -45,7 +48,67 @@ void LPBot::onReady(const dpp::ready_t& event)
     // bot is ready
 }
 
+void LPBot::updatePlayerData(const std::string& puuid)
+{
+    auto playerData = riotAPI.getPlayerData(puuid);
+    if (playerData)
+    {
+        matchDB.addPlayerData(*playerData);
+    }
+}
+void LPBot::updateAllPlayerData()
+{
+    for (const auto& p : players)
+    {
+        updatePlayerData(p.puuid);
+    }
+}
 
+void LPBot::loadPlayersToTrack(const std::string& path)
+{
+    std::vector<std::string> lines;
+    std::ifstream file(path);
+    if (file.is_open())
+    {
+        std::string line;
+        while (std::getline(file, line))
+        {
+            lines.push_back(line);
+        }
+        file.close();
+    }
+
+    for (const auto& playerString : lines)
+    {
+        // first check if we know their puuid
+        if (auto foundPUUID = matchDB.getPuuid(playerString))
+        {
+            players.push_back({*foundPUUID, playerString});
+        }
+        else
+        {
+            std::cout << "couldnt find puuid" << std::endl;
+            std::stringstream ss(playerString);
+            // tokens
+            std::string gameName;
+            std::string tagLine;
+            // load to tokens
+            std::getline(ss, gameName, '#');
+            std::getline(ss, tagLine, '#');
+
+            auto puuid = riotAPI.getPUUID(gameName, tagLine);
+            if (puuid) {
+                matchDB.addPUUID(playerString, *puuid);
+                players.push_back({*puuid, playerString});
+            }
+        }
+    }
+
+    for (const auto& p : players)
+    {
+        std::cout << "PUUID: " << p.puuid << ", player name: " << p.gameName << std::endl;
+    }
+}
 
 void LPBot::onLog(const dpp::log_t& event)
 {
@@ -63,4 +126,16 @@ void LPBot::onLog(const dpp::log_t& event)
     }
 
     std::cout << prefix << " " << event.message << std::endl;
+}
+
+void LPBot::update()
+{
+    while (!stopUpdates)
+    {
+        updateAllPlayerData();
+
+        std::this_thread::sleep_for(std::chrono::seconds(30));
+    }
+
+    std::cout << "Update thread stopped" << std::endl;
 }

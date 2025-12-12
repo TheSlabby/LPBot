@@ -4,7 +4,9 @@
 int main(int argc, char* arv[])
 {
     const char* token_env = std::getenv("DISCORD_TOKEN");
-    LPBot bot(token_env);
+    const char* lpbot_dir = std::getenv("LPBOT_DIR");
+
+    LPBot bot(token_env, lpbot_dir);
     bot.start();
     // std::cout << "using discord token: " << token_env << std::endl;
 

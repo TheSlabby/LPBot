@@ -2,18 +2,28 @@
 
 #include <iostream>
 #include <dpp/dpp.h>
+#include <fstream>
 #include "MatchDB.h"
 #include "RiotAPI.h"
 
 class LPBot
 {
 public:
-    LPBot(const char* token);
+    LPBot(const char* token, const char* dir);
+    ~LPBot();
 
     void start();
+    
+    void loadPlayersToTrack(const std::string& path);
+    void updateAllPlayerData();
 
 private:
     dpp::cluster bot;
+
+    Players players;
+
+    // private functions
+    void updatePlayerData(const std::string& puuid);
 
     // events
     void onLog(const dpp::log_t& event);
@@ -24,5 +34,11 @@ private:
     MatchDB matchDB;
     // riot api
     RiotAPI riotAPI;
+
+
+    // update thread
+    std::thread update_thread;
+    std::atomic<bool> stopUpdates {false};
+    void update();
 
 };

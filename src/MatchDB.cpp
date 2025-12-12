@@ -10,19 +10,25 @@ MatchDB::MatchDB(const std::string& dbPath)
         std::cout << "Opened database: " << dbPath << " successfully!" << std::endl;
     }
 
-    // create matches table
-    const char* sql = 
-            "CREATE TABLE IF NOT EXISTS matches ("
+    runQuery( "CREATE TABLE IF NOT EXISTS matches ("
             "id TEXT PRIMARY KEY, "
-            "match_json TEXT);";
+            "match_json TEXT);");
+    // create puuid table
+    runQuery("CREATE TABLE IF NOT EXISTS puuids ("
+            "player_name TEXT PRIMARY KEY, "
+            "puuid TEXT);");
     
-    char* errMsg = 0;
-    rc = sqlite3_exec(db, sql, 0, 0, &errMsg);
-    if (rc != SQLITE_OK)
-    {
-        std::cerr << "SQL ERROR: " << errMsg << std::endl;
-        sqlite3_free(errMsg);
-    }
+    // create playerData table
+    runQuery("CREATE TABLE IF NOT EXISTS player_data ("
+            "timestamp INTEGER NOT NULL PRIMARY KEY,"
+            "puuid TEXT NOT NULL,"
+            "rank TEXT,"
+            "tier TEXT,"
+            "lp INTEGER,"
+            "wins INTEGER,"
+            "losses INTEGER"
+            ");"
+    );
 }
 
 
@@ -32,6 +38,68 @@ MatchDB::~MatchDB()
 }
 
 
+void MatchDB::runQuery(const std::string& query)
+{
+    const char* sql = query.c_str();
+    
+    char* errMsg = 0;
+    int rc = sqlite3_exec(db, sql, 0, 0, &errMsg);
+    if (rc != SQLITE_OK)
+    {
+        std::cerr << "SQL ERROR: " << errMsg << std::endl;
+        sqlite3_free(errMsg);
+    }
+}
+
+void MatchDB::addPlayerData(const PlayerData& playerData)
+{
+    sqlite3_stmt* stmt;
+    std::string sql = "INSERT INTO player_data"
+                    "(puuid, timestamp, rank, tier, lp, wins, losses)"
+                    "VALUES (?,?,?,?,?,?,?)";
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, 0) != SQLITE_OK)
+    {
+        std::cerr << "Failed to prepare statement" << std::endl;
+        return;
+    }
+
+    auto epochTime = playerData.timestamp.time_since_epoch();
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(epochTime);
+    sqlite3_int64 timestamp_ms = ms.count();
+
+    sqlite3_bind_text(stmt, 1, playerData.puuid.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_int64(stmt, 2, timestamp_ms);
+    sqlite3_bind_text(stmt, 3, playerData.rank.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 4, playerData.tier.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_int(stmt, 5, playerData.lp);
+    sqlite3_bind_int(stmt, 6, playerData.wins);
+    sqlite3_bind_int(stmt, 7, playerData.losses);
+
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+        std::cerr << "Execution error when inserting data: " << sqlite3_errmsg(db) << std::endl;
+    }
+
+    sqlite3_finalize(stmt);
+}
+
+void MatchDB::addPUUID(const std::string& playerName, const std::string& puuid)
+{
+    sqlite3_stmt* stmt;
+    std::string sql = "INSERT INTO puuids (player_name, puuid) VALUES (?,?)";
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, 0) != SQLITE_OK)
+    {
+        std::cerr << "Failed to prepare statement" << std::endl;
+        return;
+    }
+    sqlite3_bind_text(stmt, 1, playerName.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, puuid.c_str(), -1, SQLITE_STATIC);
+
+    // run query
+    sqlite3_step(stmt);
+    // clean up
+    sqlite3_finalize(stmt);
+
+}
 
 bool MatchDB::saveMatch(const std::string& match_id, const std::string& json_data)
 {
@@ -58,4 +126,28 @@ bool MatchDB::saveMatch(const std::string& match_id, const std::string& json_dat
     sqlite3_finalize(stmt);
 
     return inserted;
+}
+
+std::optional<std::string> MatchDB::getPuuid(const std::string& playerName)
+{
+    std::optional<std::string> puuid = std::nullopt;
+    sqlite3_stmt* stmt;
+    std::string sql = "SELECT * FROM puuids WHERE player_name = ?";
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, 0) != SQLITE_OK) {
+        std::cerr << "Failed to prepare statement" << std::endl;
+    }
+
+    sqlite3_bind_text(stmt, 1, playerName.c_str(), -1, SQLITE_STATIC);
+
+    int result = sqlite3_step(stmt);
+    if (result == SQLITE_ROW) {
+        const unsigned char* columnData = sqlite3_column_text(stmt, 1);
+
+        if (columnData) {
+            puuid = reinterpret_cast<const char*>(columnData);
+        }
+    }
+
+    sqlite3_finalize(stmt);
+    return puuid;
 }

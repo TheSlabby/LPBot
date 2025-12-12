@@ -5,24 +5,9 @@
 #include <httplib.h>
 #include <optional>
 #include <chrono>
+#include "DataStructures.h"
 
 using json = nlohmann::json;
-
-
-// player data struct
-struct PlayerData {
-    std::string puuid;
-    
-    // solo/duo
-    std::string tier;
-    std::string rank;
-    int lp;
-    int wins;
-    int losses;
-    std::chrono::system_clock::time_point timestamp;
-
-};
-
 
 class RiotAPI
 {

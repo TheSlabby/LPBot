@@ -3,9 +3,6 @@
 RiotAPI::RiotAPI()
 {
     API_KEY = std::getenv("RIOT_API_KEY");
-
-    // url base
-
 }
 
 
