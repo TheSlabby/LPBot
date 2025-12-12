@@ -2,6 +2,8 @@
 
 #include <iostream>
 #include <dpp/dpp.h>
+#include "MatchDB.h"
+#include "RiotAPI.h"
 
 class LPBot
 {
@@ -17,5 +19,10 @@ private:
     void onLog(const dpp::log_t& event);
     void onReady(const dpp::ready_t& event);
     void incomingMessage(const dpp::message_create_t& event);
+
+    // database
+    MatchDB matchDB;
+    // riot api
+    RiotAPI riotAPI;
 
 };

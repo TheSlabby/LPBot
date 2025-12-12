@@ -1,7 +1,8 @@
 #include "LPBot.h"
 
 LPBot::LPBot(const char* token)
-    : bot(token, dpp::i_default_intents | dpp::i_message_content)
+    : bot(token, dpp::i_default_intents | dpp::i_message_content),
+    matchDB("/home/walker/LPBot/database.sqlite")
 {
     // events
     bot.on_message_create([this](const dpp::message_create_t& event){
@@ -13,6 +14,17 @@ LPBot::LPBot(const char* token)
     bot.on_log([this](const dpp::log_t& event){
         this->onLog(event);
     });
+
+    // grab puuid
+    auto puuid = riotAPI.getPUUID("TheSlab", "333");
+    if (puuid) {
+        std::cout << " got puuid: " << *puuid << std::endl;
+        // get ranked info
+        riotAPI.getPlayerData(*puuid);
+    }
+
+    bool inserted = matchDB.saveMatch("test", "testData");
+    std::cout << "insreted match: " << inserted << std::endl;
 }
 
 void LPBot::start()
