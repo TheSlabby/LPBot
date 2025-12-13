@@ -5,6 +5,7 @@
 #include <fstream>
 #include "MatchDB.h"
 #include "RiotAPI.h"
+#include "DataStructures.h"
 
 class LPBot
 {
@@ -17,6 +18,8 @@ public:
     void loadPlayersToTrack(const std::string& path);
     void updateAllPlayerData();
 
+    dpp::embed playerInfoEmbed(const PlayerData& playerInfo);
+
 private:
     dpp::cluster bot;
 
@@ -27,10 +30,12 @@ private:
     void playerDataChanged(const PlayerData& old, const PlayerData& current);
 
     std::string getPlayerNameFromPUUID(const std::string& puuid);
+    std::string getPUUIDFromPlayerName(const std::string& playerName);
 
     // events
     void onLog(const dpp::log_t& event);
     void onReady(const dpp::ready_t& event);
+    void onSlashCommand(const dpp::slashcommand_t& event);
     void incomingMessage(const dpp::message_create_t& event);
 
     // database

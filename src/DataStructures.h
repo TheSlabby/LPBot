@@ -18,6 +18,12 @@ struct PlayerData {
 
 };
 
+// from Summoner-v4
+struct SummonerInfo {
+    int iconID;
+    long level;
+};
+
 struct Player {
     std::string puuid;
     std::string gameName;

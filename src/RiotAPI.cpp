@@ -3,6 +3,8 @@
 RiotAPI::RiotAPI()
 {
     API_KEY = std::getenv("RIOT_API_KEY");
+    iconBaseURL = std::getenv("LPBOT_PROFILE_ICON_URL");
+    rankImageBaseURL = std::getenv("LPBOT_RANK_ICON_URL");
 }
 
 
@@ -14,9 +16,7 @@ std::optional<std::string> RiotAPI::getPUUID(const std::string& gameName, const 
             + gameName + "/"
             + tagLine
             + "?api_key=" + API_KEY;
-    
-    std::cout << "making request to: " << URL_BASE_AMERICAS << path << std::endl;
-    
+        
     if (auto res = client.Get(path)) {
         if (res->status == 200) {
             try {
@@ -42,9 +42,7 @@ std::optional<PlayerData> RiotAPI::getPlayerData(const std::string& puuid)
     std::string path = "/lol/league/v4/entries/by-puuid/"
             + puuid
             + "?api_key=" + API_KEY;
-    
-    std::cout << "making request to: " << URL_BASE_NA1 << path << std::endl;
-    
+        
     if (auto res = client.Get(path)) {
         if (res->status == 200) {
             try {
@@ -81,4 +79,49 @@ std::optional<PlayerData> RiotAPI::getPlayerData(const std::string& puuid)
     
     return std::nullopt;
 
+}
+
+std::optional<SummonerInfo> RiotAPI::getSummonerInfo(const std::string& puuid)
+{
+    httplib::Client client(URL_BASE_NA1);
+
+    std::string path = "/lol/summoner/v4/summoners/by-puuid/"
+            + puuid
+            + "?api_key=" + API_KEY;
+        
+    if (auto res = client.Get(path)) {
+        if (res->status == 200) {
+            try {
+                json j = json::parse(res->body);
+
+                SummonerInfo summonerInfo;
+                summonerInfo.iconID = j["profileIconId"];
+                summonerInfo.level = j["summonerLevel"];
+                return summonerInfo;
+
+            } catch (json::parse_error& e) {
+                std::cerr << "JSON error: " << e.what() << std::endl;
+            }
+        } else {
+            std::cerr << "ERORR: status != 200" << std::endl;
+        }
+    } else {
+        std::cerr << "Network error" << std::endl;
+    }
+    
+    return std::nullopt;
+}
+
+std::string RiotAPI::getIconFromID(int id)
+{
+    return iconBaseURL + std::to_string(id) + ".png";
+}
+
+std::string RiotAPI::getRankImage(const PlayerData& playerData)
+{
+    std::string tier = playerData.tier;
+    std::transform(tier.begin(), tier.end(), tier.begin(),
+                [](unsigned char c) { return std::tolower(c); }
+    );
+    return rankImageBaseURL + tier + ".png";
 }
