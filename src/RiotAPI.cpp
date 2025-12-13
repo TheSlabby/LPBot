@@ -1,10 +1,12 @@
 #include "RiotAPI.h"
 
-RiotAPI::RiotAPI()
+RiotAPI::RiotAPI(const char* apiKey, const char* profileIconURL, const char* rankIconURL) :
+    API_KEY(apiKey),
+    PROFILE_ICON_BASE_URL(profileIconURL),
+    RANK_ICON_BASE_URL(rankIconURL)
+
 {
-    API_KEY = std::getenv("RIOT_API_KEY");
-    iconBaseURL = std::getenv("LPBOT_PROFILE_ICON_URL");
-    rankImageBaseURL = std::getenv("LPBOT_RANK_ICON_URL");
+    // ctor
 }
 
 
@@ -114,7 +116,7 @@ std::optional<SummonerInfo> RiotAPI::getSummonerInfo(const std::string& puuid)
 
 std::string RiotAPI::getIconFromID(int id)
 {
-    return iconBaseURL + std::to_string(id) + ".png";
+    return PROFILE_ICON_BASE_URL + std::to_string(id) + ".png";
 }
 
 std::string RiotAPI::getRankImage(const PlayerData& playerData)
@@ -123,5 +125,5 @@ std::string RiotAPI::getRankImage(const PlayerData& playerData)
     std::transform(tier.begin(), tier.end(), tier.begin(),
                 [](unsigned char c) { return std::tolower(c); }
     );
-    return rankImageBaseURL + tier + ".png";
+    return RANK_ICON_BASE_URL + tier + ".png";
 }

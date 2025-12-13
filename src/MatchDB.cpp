@@ -177,8 +177,6 @@ std::optional<PlayerData> MatchDB::getLatestPlayerData(const std::string& puuid)
         data.losses = query.get_int(6);
 
         return data;
-    } else {
-        std::cout << "Couldn't find latest player data for: " << puuid << std::endl;
     }
 
     return std::nullopt;

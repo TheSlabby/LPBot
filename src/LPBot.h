@@ -10,7 +10,8 @@
 class LPBot
 {
 public:
-    LPBot(const char* token, const char* dir);
+    LPBot(const char* token, const char* broadcastChannel, int updateRate, const char* dir,
+            const char* riotApiKey, const char* profileIconURL, const char* rankIconURL);
     ~LPBot();
 
     void start();
@@ -18,10 +19,17 @@ public:
     void loadPlayersToTrack(const std::string& path);
     void updateAllPlayerData();
 
+    // embeds
     dpp::embed playerInfoEmbed(const PlayerData& playerInfo);
+    dpp::embed tierUpEmbed(const PlayerData& playerInfo);
+    dpp::embed tierDownEmbed(const PlayerData& playerInfo);
 
 private:
     dpp::cluster bot;
+
+    // loaded from env
+    std::string broadcastChannel;
+    int UPDATE_RATE;
 
     Players players;
 

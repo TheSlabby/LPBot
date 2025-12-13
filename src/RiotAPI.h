@@ -15,7 +15,7 @@ using json = nlohmann::json;
 class RiotAPI
 {
 public:
-    RiotAPI();
+    RiotAPI(const char* apiKey, const char* profileIconURL, const char* rankIconURL);
 
     std::optional<std::string> getPUUID(const std::string& gameName, const std::string& tagLine);
 
@@ -31,10 +31,10 @@ public:
     inline static const std::string URL_BASE_AMERICAS = "https://americas.api.riotgames.com";
     inline static const std::string URL_BASE_NA1 = "https://na1.api.riotgames.com";
 
-    inline static std::string API_KEY;
 
 private:
-    std::string iconBaseURL;
-    std::string rankImageBaseURL;
+    std::string API_KEY;
+    std::string PROFILE_ICON_BASE_URL;
+    std::string RANK_ICON_BASE_URL;
 
 };
