@@ -365,9 +365,14 @@ dpp::embed LPBot::tierDownEmbed(const PlayerData& playerInfo)
     authorEmbed.url = "https://www.op.gg/summoners/na/" + urlName;
 
     return dpp::embed()
-        .set_color(dpp::colors::green_snake)
-        .set_title(playerName + std::string(" is a LOSER!"))
-        .set_description(std::string("They just deranked to ") + playerInfo.tier + std::string("! LOL"))
-        .set_author(authorEmbed)
-        .set_image(rankImage);
+    .set_color(dpp::colors::green_snake)
+    .set_title(playerName + std::string(" is a pathetic LOSER"))
+    .set_description(
+        std::string("they just deranked to ") +
+        playerInfo.tier +
+        std::string("! LOL!! fucking die already, trash <3")
+    )
+    .set_author(authorEmbed)
+    .set_image(rankImage);
+
 }
