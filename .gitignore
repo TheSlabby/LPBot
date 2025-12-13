@@ -2,3 +2,4 @@ build/
 .vscode/
 *.sqlite
 players.txt
+*.sh

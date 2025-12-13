@@ -4,6 +4,7 @@
 #include <string>
 #include <iostream>
 #include <optional>
+#include "DBQuery.h"
 #include "DataStructures.h"
 
 class MatchDB
@@ -19,6 +20,7 @@ public:
     void addPUUID(const std::string& playerName, const std::string& puuid);
 
     void addPlayerData(const PlayerData& playerData);
+    std::optional<PlayerData> getLatestPlayerData(const std::string& puuid);
 
 private:
     sqlite3* db;

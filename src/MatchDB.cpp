@@ -151,3 +151,35 @@ std::optional<std::string> MatchDB::getPuuid(const std::string& playerName)
     sqlite3_finalize(stmt);
     return puuid;
 }
+
+
+std::optional<PlayerData> MatchDB::getLatestPlayerData(const std::string& puuid)
+{
+    std::string sql = "SELECT * FROM player_data WHERE puuid = ? "
+                        "ORDER BY timestamp DESC LIMIT 1";
+    DBQuery query(db, sql);
+    query.bind(1, puuid);
+
+    if (query.next()) {
+        // found
+        // figrue out timestamp
+        int64_t timestamp_ms = query.get_int64(0);
+        std::chrono::milliseconds duration(timestamp_ms);
+
+        // fill out player data
+        PlayerData data;
+        data.timestamp = std::chrono::system_clock::time_point(duration);
+        data.puuid = query.get_string(1);
+        data.rank = query.get_string(2);
+        data.tier = query.get_string(3);
+        data.lp = query.get_int(4);
+        data.wins = query.get_int(5);
+        data.losses = query.get_int(6);
+
+        return data;
+    } else {
+        std::cout << "Couldn't find latest player data for: " << puuid << std::endl;
+    }
+
+    return std::nullopt;
+}

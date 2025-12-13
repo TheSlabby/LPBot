@@ -50,10 +50,25 @@ void LPBot::onReady(const dpp::ready_t& event)
 
 void LPBot::updatePlayerData(const std::string& puuid)
 {
+    // get previous data
+    auto prevPlayerData = matchDB.getLatestPlayerData(puuid);
+
     auto playerData = riotAPI.getPlayerData(puuid);
     if (playerData)
     {
-        matchDB.addPlayerData(*playerData);
+        const auto& currentData = *playerData;
+        matchDB.addPlayerData(currentData);
+
+        // check lp change
+        if (prevPlayerData) {
+            const auto& previousData = *prevPlayerData;
+            if (   (previousData.lp != currentData.lp)
+                || (previousData.rank != currentData.rank)
+                || (previousData.tier != currentData.tier)        
+            ) {
+                playerDataChanged(previousData, currentData);
+            }
+        }
     }
 }
 void LPBot::updateAllPlayerData()
@@ -134,8 +149,27 @@ void LPBot::update()
     {
         updateAllPlayerData();
 
-        std::this_thread::sleep_for(std::chrono::seconds(30));
+        std::this_thread::sleep_for(std::chrono::seconds(600));
     }
 
     std::cout << "Update thread stopped" << std::endl;
+}
+
+std::string LPBot::getPlayerNameFromPUUID(const std::string& puuid)
+{
+    for (const auto& p : players) {
+        if (p.puuid == puuid)
+            return p.gameName;
+    }
+
+    return "N/A";
+}
+
+void LPBot::playerDataChanged(const PlayerData& old, const PlayerData& current)
+{
+    auto puuid = current.puuid;
+    auto playerName = getPlayerNameFromPUUID(puuid);
+
+    std::cout << playerName << " LP changed! previous: "
+            << old.lp << ", current: " << current.lp;
 }

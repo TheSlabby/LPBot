@@ -24,6 +24,9 @@ private:
 
     // private functions
     void updatePlayerData(const std::string& puuid);
+    void playerDataChanged(const PlayerData& old, const PlayerData& current);
+
+    std::string getPlayerNameFromPUUID(const std::string& puuid);
 
     // events
     void onLog(const dpp::log_t& event);
