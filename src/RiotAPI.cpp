@@ -1,9 +1,10 @@
 #include "RiotAPI.h"
 
-RiotAPI::RiotAPI(const char* apiKey, const char* profileIconURL, const char* rankIconURL) :
+RiotAPI::RiotAPI(const char* apiKey, const char* profileIconURL, const char* rankIconURL, const char* champIconURL) :
     API_KEY(apiKey),
     PROFILE_ICON_BASE_URL(profileIconURL),
-    RANK_ICON_BASE_URL(rankIconURL)
+    RANK_ICON_BASE_URL(rankIconURL),
+    CHAMPION_ICON_BASE_URL(champIconURL)
 
 {
     // ctor
@@ -126,4 +127,71 @@ std::string RiotAPI::getRankImage(const PlayerData& playerData)
                 [](unsigned char c) { return std::tolower(c); }
     );
     return RANK_ICON_BASE_URL + tier + ".png";
+}
+
+std::string RiotAPI::getChampionIcon(const std::string& championName)
+{
+    return CHAMPION_ICON_BASE_URL + championName + ".png";
+}
+
+
+
+std::optional<json> RiotAPI::getMatch(const std::string& matchId)
+{
+    httplib::Client client(URL_BASE_AMERICAS);
+
+    std::string path = "/lol/match/v5/matches/"
+            + matchId
+            + "?api_key=" + API_KEY;
+        
+    if (auto res = client.Get(path)) {
+        if (res->status == 200) {
+            try {
+                return json::parse(res->body);
+            } catch (json::parse_error& e) {
+                std::cerr << "JSON error: " << e.what() << std::endl;
+            }
+        } else {
+            std::cerr << "ERORR: status != 200" << std::endl;
+        }
+    } else {
+        std::cerr << "Network error" << std::endl;
+    }
+    
+    return std::nullopt;
+}
+
+std::optional<std::vector<std::string>> RiotAPI::getRecentMatches(const std::string& puuid)
+{
+    httplib::Client client(URL_BASE_AMERICAS);
+
+    std::string path = "/lol/match/v5/matches/by-puuid/"
+            + puuid
+            + "/ids"
+            + "?count=50" // get 50 matches
+            + "&type=ranked" // only ranked modes
+            + "&api_key=" + API_KEY;
+        
+    if (auto res = client.Get(path)) {
+        if (res->status == 200) {
+            try {
+                // get list of IDs
+                std::vector<std::string> matchIds;
+                json j = json::parse(res->body);
+                for (const auto& id : j)
+                    matchIds.push_back(id.get<std::string>());
+                
+                return matchIds; // return list
+
+            } catch (json::parse_error& e) {
+                std::cerr << "JSON error: " << e.what() << std::endl;
+            }
+        } else {
+            std::cerr << "ERORR: status != 200" << std::endl;
+        }
+    } else {
+        std::cerr << "Network error" << std::endl;
+    }
+    
+    return std::nullopt;
 }

@@ -181,3 +181,25 @@ std::optional<PlayerData> MatchDB::getLatestPlayerData(const std::string& puuid)
 
     return std::nullopt;
 }
+
+void MatchDB::addMatch(const std::string& id, const std::string& data)
+{
+    std::string sql = "INSERT INTO matches (id, match_json) VALUES (?,?)";
+    DBQuery query(db, sql);
+    query.bind(1, id);
+    query.bind(2, data);
+
+    query.step();
+}
+
+std::optional<std::string> MatchDB::getMatch(const std::string& id)
+{
+    std::string sql = "SELECT match_json FROM matches WHERE id = ?";
+    DBQuery query(db, sql);
+    query.bind(1, id);
+    if (query.next())
+    {
+        return query.get_string(1);
+    }
+    return std::nullopt;
+}

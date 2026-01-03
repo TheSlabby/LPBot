@@ -11,18 +11,21 @@ class LPBot
 {
 public:
     LPBot(const char* token, const char* broadcastChannel, int updateRate, const char* dir,
-            const char* riotApiKey, const char* profileIconURL, const char* rankIconURL);
+            const char* riotApiKey, const char* profileIconURL, const char* rankIconURL, const char* champIconURL);
     ~LPBot();
 
     void start();
     
     void loadPlayersToTrack(const std::string& path);
     void updateAllPlayerData();
+    void fetchMatches(); // get match data for next match ID in queue
 
     // embeds
     dpp::embed playerInfoEmbed(const PlayerData& playerInfo);
     dpp::embed tierUpEmbed(const PlayerData& playerInfo);
     dpp::embed tierDownEmbed(const PlayerData& playerInfo);
+    dpp::embed badGameEmbed(const Player& p, const std::string& champion, int kills, int deaths, int assists);
+    dpp::embed greatGameEmbed(const Player& p, const std::string& champion, int kills, int deaths, int assists);
 
 private:
     dpp::cluster bot;
@@ -36,6 +39,7 @@ private:
     // private functions
     void updatePlayerData(const std::string& puuid);
     void playerDataChanged(const PlayerData& old, const PlayerData& current);
+    void processNewMatch(const json& jsonData);
 
     std::string getPlayerNameFromPUUID(const std::string& puuid);
     std::string getPUUIDFromPlayerName(const std::string& playerName);
@@ -56,5 +60,10 @@ private:
     std::thread update_thread;
     std::atomic<bool> stopUpdates {false};
     void update();
+
+
+    // queue of matches to fetch
+    std::unordered_set<std::string> matchIdsToFetch;
+    std::mutex matchFetchMutex;
 
 };

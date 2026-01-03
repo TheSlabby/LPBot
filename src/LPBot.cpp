@@ -36,10 +36,10 @@ static int rankToInt(const std::string& rank) {
 }
 
 LPBot::LPBot(const char* token, const char* broadcastChannel, int updateRate, const char* dir,
-             const char* riotApiKey, const char* profileIconURL, const char* rankIconURL) :
+             const char* riotApiKey, const char* profileIconURL, const char* rankIconURL, const char* champIconURL) :
     bot(token, dpp::i_default_intents | dpp::i_message_content),
     matchDB(std::filesystem::path(dir) / "database.sqlite"),
-    riotAPI(riotApiKey, profileIconURL, rankIconURL),
+    riotAPI(riotApiKey, profileIconURL, rankIconURL, champIconURL),
     broadcastChannel(broadcastChannel),
     UPDATE_RATE(updateRate)
 {
@@ -155,6 +155,24 @@ void LPBot::updatePlayerData(const std::string& puuid)
             }
         }
     }
+
+    // get recent match IDs
+    auto matchHistory = riotAPI.getRecentMatches(puuid);
+    if (matchHistory)
+    {
+        std::lock_guard<std::mutex> lock(matchFetchMutex); // get match set mutex
+        std::vector<std::string> matches = matchHistory.value();
+        for (const std::string& match : matches)
+        {
+            // only add matches to queue if they're not already in db
+            if (!matchDB.getMatch(match))
+                matchIdsToFetch.insert(match);
+        }
+    }
+    else
+    {
+        std::cout << "couldn't get match history for: " << puuid << std::endl;
+    }
 }
 void LPBot::updateAllPlayerData()
 {
@@ -233,11 +251,76 @@ void LPBot::update()
     while (!stopUpdates)
     {
         updateAllPlayerData();
+        fetchMatches();
 
         std::this_thread::sleep_for(std::chrono::seconds(UPDATE_RATE));
     }
 
     std::cout << "Update thread stopped" << std::endl;
+}
+
+void LPBot::fetchMatches()
+{
+    std::string matchId;
+    {
+        std::lock_guard<std::mutex> lock(matchFetchMutex);
+        if (matchIdsToFetch.empty()) return;
+        auto it = matchIdsToFetch.begin();
+        matchId = *it;
+        matchIdsToFetch.erase(it);
+
+        std::cout << "fetching match json for id: " << matchId << ", queue size: " << matchIdsToFetch.size() << std::endl;
+    }
+
+    auto j = riotAPI.getMatch(matchId);
+    if (j)
+    {
+        json jsonData = *j;
+        std::string matchString = jsonData.dump();
+        matchDB.addMatch(matchId, matchString);
+        processNewMatch(jsonData);
+    }
+    else
+    {
+        std::cout << "failed to get match: " << matchId << std::endl;
+    }
+}
+
+void LPBot::processNewMatch(const json& jsonData)
+{
+    const auto& participants = jsonData["info"]["participants"];
+    for (const auto& p : participants)
+    {
+        std::string puuid = p["puuid"];
+        auto it = std::find_if(players.begin(), players.end(), [&](const Player& player){
+            return player.puuid == puuid;
+        });
+        if (it != players.end())
+        {
+            Player player = *it;
+            // we are tracking this player
+            int kills = p["kills"];
+            int deaths = p["deaths"];
+            int assists = p["assists"];
+            int deathsSafe = (deaths > 0) ? deaths : 1; // avoid division by 0
+            std::string champion = p["championName"];
+            float kda = static_cast<float>(kills + assists) / deathsSafe;
+            if (kda > 6.0f)
+            {
+                auto embed = greatGameEmbed(player, champion, kills, deaths, assists);
+                auto msg = dpp::message(embed);
+                msg.channel_id = broadcastChannel;
+                bot.message_create(msg);
+            }
+            else if (kda < 1.0f)
+            {
+                auto embed = badGameEmbed(player, champion, kills, deaths, assists);
+                auto msg = dpp::message(embed);
+                msg.channel_id = broadcastChannel;
+                bot.message_create(msg);
+            }
+        }
+    }
 }
 
 std::string LPBot::getPlayerNameFromPUUID(const std::string& puuid)
@@ -370,4 +453,70 @@ dpp::embed LPBot::tierDownEmbed(const PlayerData& playerInfo)
         .set_description(std::string("They just deranked to ") + playerInfo.tier + std::string("! LOL"))
         .set_author(authorEmbed)
         .set_image(rankImage);
+}
+
+dpp::embed LPBot::badGameEmbed(const Player& player, const std::string& champion, int kills, int deaths, int assists)
+{
+    std::string playerName = player.gameName;
+    std::string puuid = player.puuid;
+
+    // get images
+    auto summonerInfo = riotAPI.getSummonerInfo(puuid);
+    int iconId = summonerInfo ? summonerInfo.value().iconID : 1;
+    std::string icon = riotAPI.getIconFromID(iconId);
+    std::string champIcon = riotAPI.getChampionIcon(champion);
+
+    // create author embed
+    dpp::embed_author authorEmbed = dpp::embed_author();
+    authorEmbed.name = playerName;
+    authorEmbed.icon_url = icon;
+    std::string urlName = playerName;
+    std::replace(urlName.begin(), urlName.end(), '#', '-');
+    authorEmbed.url = "https://www.op.gg/summoners/na/" + urlName;
+
+    std::string ansiKDA = "```ansi\n";
+    ansiKDA += "\u001b[0;37m" + std::to_string(kills) + " / "; // White Kills
+    ansiKDA += "\u001b[0;31m" + std::to_string(deaths);        // RED Deaths
+    ansiKDA += "\u001b[0;37m / " + std::to_string(assists);    // White Assists
+    ansiKDA += "\n```";
+
+    return dpp::embed()
+        .set_color(dpp::colors::red_blood)
+        .set_title("What a TERRIBLE game! LOL")
+        .set_author(authorEmbed)
+        .set_thumbnail(champIcon)
+        .set_description(ansiKDA);
+}
+
+dpp::embed LPBot::greatGameEmbed(const Player& player, const std::string& champion, int kills, int deaths, int assists)
+{
+    std::string playerName = player.gameName;
+    std::string puuid = player.puuid;
+
+    // get images
+    auto summonerInfo = riotAPI.getSummonerInfo(puuid);
+    int iconId = summonerInfo ? summonerInfo.value().iconID : 1;
+    std::string icon = riotAPI.getIconFromID(iconId);
+    std::string champIcon = riotAPI.getChampionIcon(champion);
+
+    // create author embed
+    dpp::embed_author authorEmbed = dpp::embed_author();
+    authorEmbed.name = playerName;
+    authorEmbed.icon_url = icon;
+    std::string urlName = playerName;
+    std::replace(urlName.begin(), urlName.end(), '#', '-');
+    authorEmbed.url = "https://www.op.gg/summoners/na/" + urlName;
+
+    std::string ansiKDA = "```ansi\n";
+    ansiKDA += "\u001b[1;32m" + std::to_string(kills);         // Bold Green Kills!
+    ansiKDA += "\u001b[0;37m / " + std::to_string(deaths);     // White Deaths
+    ansiKDA += "\u001b[0;37m / " + std::to_string(assists);    // White Assists
+    ansiKDA += "\n```";
+
+    return dpp::embed()
+        .set_color(dpp::colors::red_blood)
+        .set_title("An AMAZING game! :O")
+        .set_author(authorEmbed)
+        .set_thumbnail(champIcon)
+        .set_description(ansiKDA);
 }

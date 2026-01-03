@@ -22,6 +22,9 @@ public:
     void addPlayerData(const PlayerData& playerData);
     std::optional<PlayerData> getLatestPlayerData(const std::string& puuid);
 
+    void addMatch(const std::string& id, const std::string& data);
+    std::optional<std::string> getMatch(const std::string& id);
+
 private:
     sqlite3* db;
 };
