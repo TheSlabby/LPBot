@@ -6,6 +6,7 @@
 #include "MatchDB.h"
 #include "RiotAPI.h"
 #include "DataStructures.h"
+#include "WinPredictionModel.h"
 
 class LPBot
 {
@@ -24,8 +25,8 @@ public:
     dpp::embed playerInfoEmbed(const PlayerData& playerInfo);
     dpp::embed tierUpEmbed(const PlayerData& playerInfo);
     dpp::embed tierDownEmbed(const PlayerData& playerInfo);
-    dpp::embed badGameEmbed(const Player& p, const std::string& champion, int kills, int deaths, int assists);
-    dpp::embed greatGameEmbed(const Player& p, const std::string& champion, int kills, int deaths, int assists);
+    dpp::embed badGameEmbed(const Player& p, const std::string& champion, int kills, int deaths, int assists, double score);
+    dpp::embed greatGameEmbed(const Player& p, const std::string& champion, int kills, int deaths, int assists, double score);
 
 private:
     dpp::cluster bot;
@@ -54,6 +55,8 @@ private:
     MatchDB matchDB;
     // riot api
     RiotAPI riotAPI;
+    // win prediction model
+    WinPredictionModel model;
 
 
     // update thread

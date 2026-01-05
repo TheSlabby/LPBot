@@ -31,6 +31,7 @@ target_sources(lpbot PRIVATE
     src/LPBot.cpp
     src/MatchDB.cpp
     src/RiotAPI.cpp
+    src/WinPredictionModel.cpp
 )
 
 target_link_libraries(lpbot PRIVATE

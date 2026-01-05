@@ -288,6 +288,25 @@ void LPBot::fetchMatches()
 
 void LPBot::processNewMatch(const json& jsonData)
 {
+    // run match through model
+    std::unordered_map<std::string, double> scores;
+    try {
+        std::string raw_json = model.infer(jsonData.dump());
+        json data = json::parse(raw_json);
+        for (const auto& player : players) {
+            // get name, not tag
+            std::string playerName = player.gameName;
+            size_t pos = playerName.find('#');
+            std::string key = playerName.substr(0, pos);
+            if (data.contains(key)) {
+                scores[playerName] = data[key];
+            }
+        }
+    } catch (json::parse_error& e) {
+        std::cout << "json parse failed" << std::endl;
+    }
+
+
     const auto& participants = jsonData["info"]["participants"];
     for (const auto& p : participants)
     {
@@ -307,14 +326,14 @@ void LPBot::processNewMatch(const json& jsonData)
             float kda = static_cast<float>(kills + assists) / deathsSafe;
             if (kda > 6.0f)
             {
-                auto embed = greatGameEmbed(player, champion, kills, deaths, assists);
+                auto embed = greatGameEmbed(player, champion, kills, deaths, assists, scores[player.gameName]);
                 auto msg = dpp::message(embed);
                 msg.channel_id = broadcastChannel;
                 bot.message_create(msg);
             }
             else if (kda < 1.0f)
             {
-                auto embed = badGameEmbed(player, champion, kills, deaths, assists);
+                auto embed = badGameEmbed(player, champion, kills, deaths, assists, scores[player.gameName]);
                 auto msg = dpp::message(embed);
                 msg.channel_id = broadcastChannel;
                 bot.message_create(msg);
@@ -455,7 +474,7 @@ dpp::embed LPBot::tierDownEmbed(const PlayerData& playerInfo)
         .set_image(rankImage);
 }
 
-dpp::embed LPBot::badGameEmbed(const Player& player, const std::string& champion, int kills, int deaths, int assists)
+dpp::embed LPBot::badGameEmbed(const Player& player, const std::string& champion, int kills, int deaths, int assists, double score)
 {
     std::string playerName = player.gameName;
     std::string puuid = player.puuid;
@@ -479,16 +498,21 @@ dpp::embed LPBot::badGameEmbed(const Player& player, const std::string& champion
     ansiKDA += "\u001b[0;31m" + std::to_string(deaths);        // RED Deaths
     ansiKDA += "\u001b[0;37m / " + std::to_string(assists);    // White Assists
     ansiKDA += "\n```";
-
+    
+    // ai score
+    int rounded_score = static_cast<int>(std::round(score * 100));
+    std::string footerText = "AI Score: " + std::to_string(rounded_score) + "%";
+    
     return dpp::embed()
         .set_color(dpp::colors::red_blood)
         .set_title("What a TERRIBLE game! LOL")
         .set_author(authorEmbed)
         .set_thumbnail(champIcon)
-        .set_description(ansiKDA);
+        .set_description(ansiKDA)
+        .set_footer(dpp::embed_footer().set_text(footerText));
 }
 
-dpp::embed LPBot::greatGameEmbed(const Player& player, const std::string& champion, int kills, int deaths, int assists)
+dpp::embed LPBot::greatGameEmbed(const Player& player, const std::string& champion, int kills, int deaths, int assists, double score)
 {
     std::string playerName = player.gameName;
     std::string puuid = player.puuid;
@@ -513,10 +537,15 @@ dpp::embed LPBot::greatGameEmbed(const Player& player, const std::string& champi
     ansiKDA += "\u001b[0;37m / " + std::to_string(assists);    // White Assists
     ansiKDA += "\n```";
 
+    // ai score
+    int rounded_score = static_cast<int>(std::round(score * 100));
+    std::string footerText = "AI Score: " + std::to_string(rounded_score) + "%";
+
     return dpp::embed()
         .set_color(dpp::colors::red_blood)
         .set_title("An AMAZING game! :O")
         .set_author(authorEmbed)
         .set_thumbnail(champIcon)
-        .set_description(ansiKDA);
+        .set_description(ansiKDA)
+        .set_footer(dpp::embed_footer().set_text(footerText));
 }
