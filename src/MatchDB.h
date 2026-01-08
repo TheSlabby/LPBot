@@ -25,6 +25,8 @@ public:
     void addMatch(const std::string& id, const std::string& data);
     std::optional<std::string> getMatch(const std::string& id);
 
+    int getLPDiff(const std::string& puuid, int64_t start, int64_t end);
+
 private:
     sqlite3* db;
 };

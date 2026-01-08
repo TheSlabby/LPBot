@@ -21,12 +21,19 @@ public:
     void updateAllPlayerData();
     void fetchMatches(); // get match data for next match ID in queue
 
+    // daily trigger stuff
+    void tryDailyTrigger(); // check lp differentials once a day
+    void dailyTrigger();
+    static constexpr uint DAILY_TRIGGER_TIME = 6; // hour that trigger fires (e.g. 6=6AM)
+    int lastRunDay = -1;
+
     // embeds
     dpp::embed playerInfoEmbed(const PlayerData& playerInfo);
     dpp::embed tierUpEmbed(const PlayerData& playerInfo);
     dpp::embed tierDownEmbed(const PlayerData& playerInfo);
     dpp::embed badGameEmbed(const Player& p, const std::string& champion, int kills, int deaths, int assists, double score);
     dpp::embed greatGameEmbed(const Player& p, const std::string& champion, int kills, int deaths, int assists, double score);
+    dpp::embed dailyEmbed(const std::vector<int>& lpDiff);
 
 private:
     dpp::cluster bot;

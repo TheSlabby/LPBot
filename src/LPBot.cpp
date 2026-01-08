@@ -1,39 +1,6 @@
 #include "LPBot.h"
 #include <algorithm>
-
-// util
-static int tierToInt(const std::string& tier) {
-    static constexpr std::array<std::pair<std::string_view, int>, 10> tiers {{
-        {"IRON", 0},
-        {"BRONZE", 1},
-        {"SILVER", 2},
-        {"GOLD", 3},
-        {"PLATINUM", 4},
-        {"EMERALD", 5},
-        {"DIAMOND", 6},
-        {"MASTER", 7},
-        {"GRANDMASTER", 8},
-        {"CHALLENGER", 9}
-    }};
-    for (const auto& t : tiers) {
-        if (t.first == tier)
-            return t.second;
-    }
-    return -1;
-}
-static int rankToInt(const std::string& rank) {
-    static constexpr std::array<std::pair<std::string_view, int>, 4> ranks {{
-        {"IV", 0},
-        {"III", 1},
-        {"II", 2},
-        {"I", 3}
-    }};
-    for (const auto& r : ranks) {
-        if (r.first == rank)
-            return r.second;
-    }
-    return -1;
-}
+#include <ctime>
 
 LPBot::LPBot(const char* token, const char* broadcastChannel, int updateRate, const char* dir,
              const char* riotApiKey, const char* profileIconURL, const char* rankIconURL, const char* champIconURL) :
@@ -252,6 +219,7 @@ void LPBot::update()
     {
         updateAllPlayerData();
         fetchMatches();
+        tryDailyTrigger();
 
         std::this_thread::sleep_for(std::chrono::seconds(UPDATE_RATE));
     }
@@ -331,7 +299,7 @@ void LPBot::processNewMatch(const json& jsonData)
                 msg.channel_id = broadcastChannel;
                 bot.message_create(msg);
             }
-            else if (kda < 1.0f)
+            else if (kda < 1.0f && deaths > 0) // deaths > 0 to make sure no remake
             {
                 auto embed = badGameEmbed(player, champion, kills, deaths, assists, scores[player.gameName]);
                 auto msg = dpp::message(embed);
@@ -382,6 +350,38 @@ void LPBot::playerDataChanged(const PlayerData& old, const PlayerData& current)
         msg.channel_id = broadcastChannel;
         bot.message_create(msg);
     }
+}
+
+void LPBot::tryDailyTrigger()
+{
+    auto now = std::chrono::system_clock::now();
+    auto epochTime = std::chrono::system_clock::to_time_t(now);
+    std::tm* localTime = std::localtime(&epochTime);
+
+    if (localTime->tm_hour >= DAILY_TRIGGER_TIME && lastRunDay != localTime->tm_yday)
+    {
+        lastRunDay = localTime->tm_yday;
+        dailyTrigger();
+    }
+}
+void LPBot::dailyTrigger() // runs once a day
+{
+    // get current time in ms
+    int64_t now = std::chrono::duration_cast<std::chrono::milliseconds>
+        (std::chrono::system_clock::now().time_since_epoch()).count();
+    int64_t yesterday = now - (86400000);
+    
+    std::vector<int> lpDif;
+    for (const auto& player : players) {
+        lpDif.push_back(matchDB.getLPDiff(player.puuid, yesterday, now));
+        // lpDif[player.gameName]  = matchDB.getLPDiff(player.puuid, yesterday, now);
+        // TODO maybe get avg AI score of the day
+    }
+    
+    auto embed = dailyEmbed(lpDif);
+    auto msg = dpp::message(embed);
+    msg.channel_id = broadcastChannel;
+    bot.message_create(msg);
 }
 
 dpp::embed LPBot::playerInfoEmbed(const PlayerData& playerInfo)
@@ -548,4 +548,36 @@ dpp::embed LPBot::greatGameEmbed(const Player& player, const std::string& champi
         .set_thumbnail(champIcon)
         .set_description(ansiKDA)
         .set_footer(dpp::embed_footer().set_text(footerText));
+}
+
+dpp::embed LPBot::dailyEmbed(const std::vector<int>& lpDiff)
+{
+    std::string description = "```ansi\n";
+    bool hasChanges = false;
+
+    for (int i = 0; i < players.size(); ++i) {
+        int diff = lpDiff[i];
+        if (diff == 0) continue; 
+        
+        hasChanges = true;
+        std::string name = players[i].gameName;
+
+        if (diff > 0) {
+            description += "\u001b[1;32m+" + std::to_string(diff) + " LP";
+        } else {
+            description += "\u001b[1;31m" + std::to_string(diff) + " LP";
+        }
+        description += "\u001b[0;37m   " + name + "\n";
+    }
+    description += "```";
+
+    if (!hasChanges) {
+        description = "no one played ranked today :(";
+    }
+
+    return dpp::embed()
+        .set_title("daily LP gainz")
+        .set_color(dpp::colors::blue_aquamarine)
+        .set_description(description)
+        .set_timestamp(time(0));
 }

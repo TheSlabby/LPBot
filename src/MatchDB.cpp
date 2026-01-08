@@ -20,13 +20,14 @@ MatchDB::MatchDB(const std::string& dbPath)
     
     // create playerData table
     runQuery("CREATE TABLE IF NOT EXISTS player_data ("
-            "timestamp INTEGER NOT NULL PRIMARY KEY,"
+            "timestamp INTEGER NOT NULL,"
             "puuid TEXT NOT NULL,"
             "rank TEXT,"
             "tier TEXT,"
             "lp INTEGER,"
             "wins INTEGER,"
-            "losses INTEGER"
+            "losses INTEGER,"
+            "PRIMARY KEY (timestamp, puuid)"
             ");"
     );
 }
@@ -202,4 +203,32 @@ std::optional<std::string> MatchDB::getMatch(const std::string& id)
         return query.get_string(1);
     }
     return std::nullopt;
+}
+
+int MatchDB::getLPDiff(const std::string& puuid, int64_t start, int64_t end) {
+    std::string sql = "SELECT rank, tier, lp, wins, losses FROM player_data WHERE puuid = ? AND timestamp <= ?"
+                        " ORDER BY timestamp DESC LIMIT 1";
+
+    auto getTotalLP = [&](int64_t timestamp){
+        DBQuery query(db, sql);
+        query.bind(1, puuid);
+        query.bind(2, timestamp);
+        if (query.next()) {
+            std::string rank = query.get_string(0);
+            std::string tier = query.get_string(1);
+            int lp = query.get_int(2);
+            int wins = query.get_int(3);
+            int losses = query.get_int(4);
+
+            int rankInt = rankToInt(rank);
+            int tierInt = tierToInt(tier);
+            int totalLP = (tierInt * 400) + (rankInt * 100) + (lp);
+            return totalLP;
+        }
+        return 0; // return 0 if else
+    };
+
+    int startLP = getTotalLP(start);
+    int endLP = getTotalLP(end);
+    return (endLP - startLP);
 }
