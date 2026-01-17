@@ -35,6 +35,8 @@ public:
     dpp::embed greatGameEmbed(const Player& p, const std::string& champion, int kills, int deaths, int assists, double score);
     dpp::embed dailyEmbed(const std::vector<int>& lpDiff);
 
+    static constexpr bool BAD_EMBED_ENABLED {false};
+
 private:
     dpp::cluster bot;
 

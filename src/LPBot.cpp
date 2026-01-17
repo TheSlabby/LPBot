@@ -299,7 +299,7 @@ void LPBot::processNewMatch(const json& jsonData)
                 msg.channel_id = broadcastChannel;
                 bot.message_create(msg);
             }
-            else if (kda < 1.0f && deaths > 0) // deaths > 0 to make sure no remake
+            else if (kda < 1.0f && deaths > 0 && BAD_EMBED_ENABLED) // deaths > 0 to make sure no remake
             {
                 auto embed = badGameEmbed(player, champion, kills, deaths, assists, scores[player.gameName]);
                 auto msg = dpp::message(embed);
