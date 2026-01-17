@@ -369,11 +369,11 @@ void LPBot::dailyTrigger() // runs once a day
     // get current time in ms
     int64_t now = std::chrono::duration_cast<std::chrono::milliseconds>
         (std::chrono::system_clock::now().time_since_epoch()).count();
-    int64_t yesterday = now - (86400000);
+    // int64_t yesterday = now - (86400000);
     
     std::vector<int> lpDif;
     for (const auto& player : players) {
-        lpDif.push_back(matchDB.getLPDiff(player.puuid, yesterday, now));
+        lpDif.push_back(matchDB.getLPDiff(player.puuid, SEASON_START_TIMESTAMP, now));
         // lpDif[player.gameName]  = matchDB.getLPDiff(player.puuid, yesterday, now);
         // TODO maybe get avg AI score of the day
     }
@@ -552,32 +552,45 @@ dpp::embed LPBot::greatGameEmbed(const Player& player, const std::string& champi
 
 dpp::embed LPBot::dailyEmbed(const std::vector<int>& lpDiff)
 {
-    std::string description = "```ansi\n";
-    bool hasChanges = false;
+    struct Entry {
+        std::string name;
+        int diff;
+    };
+    std::vector<Entry> leaderboard;
 
-    for (int i = 0; i < players.size(); ++i) {
-        int diff = lpDiff[i];
-        if (diff == 0) continue; 
-        
-        hasChanges = true;
-        std::string name = players[i].gameName;
+    for (size_t i = 0; i < players.size(); ++i) {
+        if (lpDiff[i] == 0) continue; 
 
-        if (diff > 0) {
-            description += "\u001b[1;32m+" + std::to_string(diff) + " LP";
-        } else {
-            description += "\u001b[1;31m" + std::to_string(diff) + " LP";
-        }
-        description += "\u001b[0;37m   " + name + "\n";
+        leaderboard.push_back({players[i].gameName, lpDiff[i]});
     }
-    description += "```";
 
-    if (!hasChanges) {
-        description = "no one played ranked today :(";
+    std::sort(leaderboard.begin(), leaderboard.end(), [](const Entry& a, const Entry& b) {
+        return a.diff > b.diff;
+    });
+
+    std::string description = "```ansi\n";
+    
+    if (leaderboard.empty()) {
+        description = "No ranked games played yet this season!";
+    } else {
+        for (size_t i = 0; i < leaderboard.size(); ++i) {
+            int diff = leaderboard[i].diff;
+            std::string name = leaderboard[i].name;
+            std::string prefix = "";
+            if (i == 0) prefix = "🥇 ";
+            else if (i == 1) prefix = "🥈 ";
+            else if (i == 2) prefix = "🥉 ";
+            else prefix = std::to_string(i + 1) + ". ";
+            std::string color = (diff >= 0) ? "\u001b[1;32m+" : "\u001b[1;31m";
+            description += prefix + color + std::to_string(diff) + " LP";
+            description += "\u001b[0;37m   " + name + "\n";
+        }
+        description += "```";
     }
 
     return dpp::embed()
-        .set_title("daily LP gainz")
-        .set_color(dpp::colors::blue_aquamarine)
+        .set_title("🏆 Season 2026 Leaderboard")
+        .set_color(dpp::colors::gold)
         .set_description(description)
         .set_timestamp(time(0));
 }

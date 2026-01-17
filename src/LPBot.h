@@ -35,7 +35,9 @@ public:
     dpp::embed greatGameEmbed(const Player& p, const std::string& champion, int kills, int deaths, int assists, double score);
     dpp::embed dailyEmbed(const std::vector<int>& lpDiff);
 
+    // constants (todo put in env var...)
     static constexpr bool BAD_EMBED_ENABLED {false};
+    static constexpr int64_t SEASON_START_TIMESTAMP {1767902400000};
 
 private:
     dpp::cluster bot;

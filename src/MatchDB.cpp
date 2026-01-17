@@ -206,10 +206,15 @@ std::optional<std::string> MatchDB::getMatch(const std::string& id)
 }
 
 int MatchDB::getLPDiff(const std::string& puuid, int64_t start, int64_t end) {
-    std::string sql = "SELECT rank, tier, lp, wins, losses FROM player_data WHERE puuid = ? AND timestamp <= ?"
-                        " ORDER BY timestamp DESC LIMIT 1";
+    std::string sqlStart = "SELECT rank, tier, lp FROM player_data "
+                           "WHERE puuid = ? AND timestamp >= ? "
+                           "ORDER BY timestamp ASC LIMIT 1";
 
-    auto getTotalLP = [&](int64_t timestamp){
+    std::string sqlEnd =   "SELECT rank, tier, lp FROM player_data "
+                           "WHERE puuid = ? AND timestamp <= ? "
+                           "ORDER BY timestamp DESC LIMIT 1";
+
+    auto getLP = [&](const std::string& sql, int64_t timestamp) {
         DBQuery query(db, sql);
         query.bind(1, puuid);
         query.bind(2, timestamp);
@@ -217,18 +222,15 @@ int MatchDB::getLPDiff(const std::string& puuid, int64_t start, int64_t end) {
             std::string rank = query.get_string(0);
             std::string tier = query.get_string(1);
             int lp = query.get_int(2);
-            int wins = query.get_int(3);
-            int losses = query.get_int(4);
-
             int rankInt = rankToInt(rank);
             int tierInt = tierToInt(tier);
-            int totalLP = (tierInt * 400) + (rankInt * 100) + (lp);
-            return totalLP;
+            return (tierInt * 400) + (rankInt * 100) + (lp);
         }
-        return 0; // return 0 if else
+        return -1;
     };
 
-    int startLP = getTotalLP(start);
-    int endLP = getTotalLP(end);
-    return (endLP - startLP);
+    int startLP = getLP(sqlStart, start);
+    int endLP = getLP(sqlEnd, end);
+    
+    return startLP > -1 ? (endLP - startLP) : 0;
 }
